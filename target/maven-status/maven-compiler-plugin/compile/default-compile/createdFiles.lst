@@ -1,0 +1,10 @@
+com/example/mnist/ui/InferenceApp.class
+com/example/mnist/ImageFolderDataset$Builder.class
+com/example/mnist/PrepareTrainingImages.class
+com/example/mnist/DigitClassifier.class
+com/example/mnist/InferMnist.class
+com/example/mnist/DigitClassifier$1.class
+com/example/mnist/ui/InferenceApp$1.class
+com/example/mnist/ImageFolderDataset.class
+com/example/mnist/TrainMnist.class
+com/example/mnist/ui/Launcher.class

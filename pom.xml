@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.example</groupId>
+    <artifactId>djl-mnist-example</artifactId>
+    <version>1.0.0</version>
+    <packaging>jar</packaging>
+
+    <properties>
+        <maven.compiler.release>21</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <djl.version>0.36.0</djl.version>
+        <javafx.version>21.0.2</javafx.version>
+        <!-- Sobrescrito pelos profiles de SO abaixo (windows/mac/linux) -->
+        <javafx.platform>linux</javafx.platform>
+        <!-- Classe usada como Main-Class no JAR final (ver seção do shade-plugin) -->
+        <app.mainClass>com.example.mnist.ui.Launcher</app.mainClass>
+    </properties>
+
+    <!--
+        Os artefatos do JavaFX são publicados com um "classifier" por
+        sistema operacional (win, mac, linux), pois cada um empacota
+        bibliotecas nativas diferentes. Estes profiles detectam o SO em que
+        o "mvn package" está rodando e ajustam automaticamente a
+        propriedade javafx.platform usada lá embaixo nas dependências.
+    -->
+    <profiles>
+        <profile>
+            <id>windows</id>
+            <activation>
+                <os><family>windows</family></os>
+            </activation>
+            <properties>
+                <javafx.platform>win</javafx.platform>
+            </properties>
+        </profile>
+        <profile>
+            <id>mac</id>
+            <activation>
+                <os><family>mac</family></os>
+            </activation>
+            <properties>
+                <javafx.platform>mac</javafx.platform>
+            </properties>
+        </profile>
+        <profile>
+            <id>linux</id>
+            <activation>
+                <os><family>unix</family><name>linux</name></os>
+            </activation>
+            <properties>
+                <javafx.platform>linux</javafx.platform>
+            </properties>
+        </profile>
+    </profiles>
+
+    <!--
+        O BOM (Bill of Materials) do DJL fixa, num só lugar, versões
+        compatíveis entre si de todos os módulos (api, model-zoo,
+        engines...). Evita ficar declarando a versão em cada
+        <dependency> separadamente.
+    -->
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>ai.djl</groupId>
+                <artifactId>bom</artifactId>
+                <version>${djl.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <dependencies>
+        <!-- API principal do DJL (NDArray, Model, Trainer, Predictor...) -->
+        <dependency>
+            <groupId>ai.djl</groupId>
+            <artifactId>api</artifactId>
+        </dependency>
+
+        <!-- Contém blocos de modelo prontos, como o Mlp (rede totalmente conectada) -->
+        <dependency>
+            <groupId>ai.djl</groupId>
+            <artifactId>model-zoo</artifactId>
+        </dependency>
+
+        <!--
+            Engine de execução. O DJL é "engine-agnostic": ele só descreve o
+            modelo, quem executa de fato as operações é o engine escolhido.
+            Aqui usamos o PyTorch, que baixa automaticamente os binários nativos
+            (libtorch) na primeira execução.
+        -->
+        <dependency>
+            <groupId>ai.djl.pytorch</groupId>
+            <artifactId>pytorch-engine</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- Logging simples só para ver o progresso do treino no console -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
+            <version>2.0.13</version>
+        </dependency>
+
+        <!--
+            JavaFX: controles de UI (botão, label, seletor de arquivos...) e
+            renderização gráfica. O classifier ${javafx.platform} garante que
+            as bibliotecas nativas corretas (Windows/Mac/Linux) sejam
+            baixadas e embutidas no JAR final, de acordo com os profiles
+            declarados acima.
+        -->
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-controls</artifactId>
+            <version>${javafx.version}</version>
+            <classifier>${javafx.platform}</classifier>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-graphics</artifactId>
+            <version>${javafx.version}</version>
+            <classifier>${javafx.platform}</classifier>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-base</artifactId>
+            <version>${javafx.version}</version>
+            <classifier>${javafx.platform}</classifier>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+                <configuration>
+                    <release>21</release>
+                </configuration>
+            </plugin>
+
+            <!-- Permite rodar as classes com "mvn exec:java -Dexec.mainClass=..." -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.3.0</version>
+            </plugin>
+
+            <!--
+                Gera um único JAR "uber/fat" contendo o projeto + TODAS as
+                dependências (DJL, JavaFX, engine PyTorch...), para poder
+                rodar com um simples "java -jar app.jar", sem precisar
+                configurar classpath nem module-path manualmente.
+
+                Roda automaticamente na fase "package": "mvn clean package"
+                já deixa o JAR pronto em target/.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.5.1</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <transformers>
+                                <!-- Define o Main-Class no MANIFEST.MF do jar gerado -->
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>${app.mainClass}</mainClass>
+                                </transformer>
+                                <!--
+                                    O DJL usa java.util.ServiceLoader (arquivos em
+                                    META-INF/services) para descobrir o engine
+                                    (PyTorch) em tempo de execução. Sem este
+                                    transformer, o shade-plugin sobrescreveria os
+                                    arquivos de serviço de dependências diferentes
+                                    em vez de mesclá-los, e o DJL não encontraria
+                                    o engine dentro do JAR final.
+                                -->
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
+                            </transformers>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>module-info.class</exclude>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>
